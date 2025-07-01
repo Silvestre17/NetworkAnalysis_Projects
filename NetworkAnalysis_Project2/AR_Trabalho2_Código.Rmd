@@ -1,0 +1,367 @@
+---
+title: "Trabalho 2 | AR"
+subtitle: "Rede Aleatórias & Comunidades"
+author: 
+- André Silvestre Nº 104532
+- Eliane Gabriel Nº 103303
+- Maria João Lourenço Nº 104716
+- Margarida Pereira Nº 105877
+- Umeima Mahomed Nº 99239
+date: 16 de janeiro de 2024
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+# Bibliotecas Necessárias
+library(igraph)       # Redes
+library(flextable)    # Tabela
+set_flextable_defaults(fonts_ignore=TRUE)
+library(officer)      # Personalizar flextable
+library(ftExtra)
+library(dplyr)
+set.seed(123)  # Para reprodutibilidade
+```
+
+# Questão 1
+
+## Implementação do Algoritmo de Geração de Redes Aleatórias **Passeio Aleatório**
+
+```{r}
+# Função para gerar redes aleatórias utilizando o Modelo Passeio Aleatório
+generate_random_network <- function(initial_size) {
+  
+  # Configuração inicial de uma clique completa com n nodos
+  rn <- make_full_graph(initial_size, directed = F)  
+  
+  # Cada uma das redes geradas deve ter 200 nodos
+  # Para isso geramos (200-valor inicial de nodos da clique)
+  for (i in 1:(200-initial_size)) {
+    
+    # Adiciona um novo nodo i (1º Passo)
+    rn <- add_vertices(rn, 1)
+    
+    # Escolhe um nodo existente aleatoriamente e ligá-lo ao novo nodo (2º Passo)
+    selected_node <- sample(1:(vcount(rn)-1), 1)      # Escolher o nodo j
+    nn <- neighbors(rn, selected_node)                # Nodos Adjacentes de j
+    rn <- add_edges(rn, c(selected_node,vcount(rn)))  # Ligar j a i
+    
+    # 3º Passo:
+    # Cada uma das restantes ligações une o nodo adicionado a um dos adjacentes 
+    # do nodo escolhido no Passo 2 com probabilidade 'p' 
+    # ou une o novo nodo a um nodo escolhido aleatoriamente com probabilidade '1 - p'
+    
+    # Adiciona mais 2 ligações (para perfazer as 3 que são impostas no enunciado)
+    for (j in 1:2) {
+      if (runif(1) < 0.8) {
+        selected_node_1 <- sample(setdiff(nn, neighbors(rn, vcount(rn))), 1) 
+        rn <- add_edges(rn, c(vcount(rn), selected_node_1))
+      }
+      else {
+        # Para garantir que está a escolher um nodo diferente do:
+        # Novo nodo e seus vizinhos e do escolhido no Passo 2 
+        nn_i <- neighbors(rn, vcount(rn))
+        selected_node_2 <- sample(setdiff(1:(vcount(rn)-1), c(selected_node,nn_i)), 1)
+        rn <- add_edges(rn, c(selected_node_2,vcount(rn)))
+      }
+    }
+  }
+  
+  return(rn)
+}
+```
+
+```{r}
+# Parâmetros das Redes Aleatórias
+initial_size_1 <- 10
+initial_size_2 <- 20
+```
+
+
+## a) Gerar e caracterizar 10 redes aleatórias a partir de clique com 10 nodos
+
+```{r}
+# a) Gerar e caracterizar 10 redes aleatórias a partir de clique com 10 nodos
+networks_1 <- lapply(1:10,function(i) generate_random_network(initial_size_1))
+
+# Caracterizar as redes geradas quanto à distância média (<l>), 
+#                                      ao coeficiente de clustering da rede (C) 
+#                                      e à existência de hubs (K)
+distances_1 <- sapply(networks_1, function(net) mean_distance(net))
+coef_clustering_1 <- sapply(networks_1, function(net) transitivity(net, type = "global"))
+hubs_1 <- sapply(networks_1, 
+                 function(net){
+                   mean(degree(net, mode = "all")*degree(net, mode = "all")/
+                          mean(degree(net, mode = "all"))^2)})
+
+result_1 <- data.frame(Rede = 1:10,
+                       Distancia_Media = round(distances_1, 4), 
+                       Coeficiente_Clustering = round(coef_clustering_1, 4), 
+                       K = round(hubs_1, 4))
+```
+
+\newpage
+
+```{r}
+cat("Resultados para clique com 10 nodos:")
+ftable <- flextable(result_1)
+ftable <- border_remove(x = ftable) %>%
+  hline(i= 1, part = "header", border = fp_border(color = "gray", width = 2)) %>%
+  hline_bottom(part = "body", border = fp_border(color = "grey", width = 1)) %>%
+  vline(j=1:3, border = fp_border(color = "white", width = 5)) %>%
+  align(j= 1:4, align = "center", part = "all") %>%
+  bg(j = 2:4, bg = "darkgrey", part = "header") %>%
+  color(j = 2:4, color = "white", part = "header") %>%
+  set_header_labels(Rede = "Rede", 
+                    Distancia_Media = "Distância Média (<l>)", 
+                    Coeficiente_Clustering = "Coeficiente de Clustering (C)",
+                    K = 'Heterogenidade (K)') %>%
+  bold(bold = TRUE, part = "header") %>%
+  bold(j = 1, bold = TRUE, part = "body") %>%
+  color(j = 1, color = "darkgrey", part = "all") %>%
+  autofit()
+ftable
+```
+
+\newpage
+
+## b) Gerar e caracterizar 10 redes aleatórias a partir de clique com 20 nodos
+
+```{r}
+# b) Gerar e caracterizar 10 redes aleatórias a partir de clique com 20 nodos
+networks_2 <- lapply(1:10, function(i) generate_random_network(initial_size_2))
+# Caracterizar as redes geradas quanto à distância média (<l>), 
+#                                      ao coeficiente de clustering da rede (C) 
+#                                      e à existência de hubs (K)
+distances_2 <- sapply(networks_2, function(net) mean_distance(net))
+coef_clustering_2 <- sapply(networks_2, function(net) transitivity(net, type = "global"))
+hubs_2 <- sapply(networks_2, 
+                 function(net){
+                   mean(degree(net, mode = "all")*degree(net, mode = "all")/
+                          mean(degree(net, mode = "all"))^2)})
+
+result_2 <- data.frame(Rede = 1:10,
+                       Distancia_Media = round(distances_2, 4), 
+                       Coeficiente_Clustering = round(coef_clustering_2, 4), 
+                       K = round(hubs_2, 4))
+
+
+```
+
+\newpage
+
+```{r}
+cat("Resultados para clique com 20 nodos:")
+ftable <- flextable(result_2)
+ftable <- border_remove(x = ftable) %>%
+  hline(i= 1, part = "header", border = fp_border(color = "gray", width = 2)) %>%
+  hline_bottom(part = "body", border = fp_border(color = "grey", width = 1)) %>%
+  vline(j=1:3, border = fp_border(color = "white", width = 5)) %>%
+  align(j= 1:4, align = "center", part = "all") %>%
+  bg(j = 2:4, bg = "darkgrey", part = "header") %>%
+  color(j = 2:4, color = "white", part = "header") %>%
+  set_header_labels(Rede = "Rede", 
+                    Distancia_Media = "Distância Média (<l>)", 
+                    Coeficiente_Clustering = "Coeficiente de Clustering (C)",
+                    K = 'Heterogenidade (K)') %>%
+  bold(bold = TRUE, part = "header") %>%
+  bold(j = 1, bold = TRUE, part = "body") %>%
+  color(j = 1, color = "darkgrey", part = "all") %>%
+  autofit()
+ftable
+```
+
+\newpage
+
+## c) Comparar os resultados obtidos em a) e b)
+
+```{r}
+# c) Comparar os resultados obtidos em a) e b)
+result_a_b <- data.frame(result_1, result_2[2:4])
+
+ftable <- flextable(result_a_b)
+ftable <- border_remove(x = ftable) %>%
+  add_header_row(values = c("",
+                            "Clique com 10 nodos", 
+                            "Clique com 20 nodos"), colwidths = c(1,3,3)) %>%
+  hline(i= 2, part = "header", border = fp_border(color = "gray", width = 2)) %>%
+  hline_bottom(part = "body", border = fp_border(color = "grey", width = 1)) %>%
+  vline(j=1:6, border = fp_border(color = "white", width = 5)) %>%
+  align(j= 1:7, align = "center", part = "all") %>%
+  bg(i=2, j = 2:4, bg = "#DF6613", part = "header") %>%
+  bg(i=2, j = 5:7, bg = "navy", part = "header") %>%
+  color(i=1, j = 2:4, color = "#DF6613", part = "header") %>%
+  color(i=1, j = 5:7, color = "navy", part = "header") %>%
+  color(i=2, j = 2:7, color = "white", part = "header") %>%
+  set_header_labels(Rede = "Rede", Distancia_Media = "<l>", Distancia_Media.1 = "<l>", 
+                    Coeficiente_Clustering = "C", Coeficiente_Clustering.1="C",
+                    K = 'K', K.1 = 'K') %>%
+  bold(bold = TRUE, part = "header") %>%
+  bold(j = 1, bold = TRUE, part = "body") %>%
+  color(j = 1, color = "darkgrey", part = "all") %>%
+  autofit()
+ftable
+```
+
+
+\newpage
+
+# Questão 2
+
+## Componente Gigante da Rede de Contactos Sociais Diretos
+
+```{r}
+# Importar a rede de um ficheiro .txt
+rede <- read_graph("trab_links.txt", format = "edgelist", directed=F)
+
+# Encontrar a componente gigante da rede
+components <- clusters(rede)
+giant_component <- induced.subgraph(rede,
+                                    which(components$membership == which.max(components$csize)))
+
+# Representar graficamente a componente gigante da rede
+plot(giant_component,
+     vertex.color= "red",vertex.label=NA, vertex.size=2,
+     vertex.frame.color=NA, edge.width= 2, )
+
+cat("Número de nodos na componente gigante:", vcount(giant_component), "\n")
+cat("Número de ligações na componente gigante:", ecount(giant_component), "\n")
+```
+
+
+## Métodos de detecção de comunidades
+
+### 1 | Remoção de Pontes
+
+```{r}
+# Iterar 5 vezes o algoritmo para verificar os resultados
+results_list_cluster_edge_betweenness <- list()
+for (i in 1:5) {
+  set.seed(i*123) # Para reprodutibilidade
+  cebd <- cluster_edge_betweenness(giant_component)
+  results_list_cluster_edge_betweenness[[i]] <- data.frame(
+    Método = paste("Remoção de Pontes [", i, "]", sep=""),
+    Número_de_Comunidades = length(cebd),
+    Dimensão_de_Cada_Comunidade = toString(table(membership(cebd)), collapse = ','),
+    Modularidade = round(modularity(cebd), 3)
+  )
+}
+
+# Combinar os resultados num único dataframe
+all_results_cluster_edge_betweenness <- do.call(rbind,
+                                                results_list_cluster_edge_betweenness)
+t(all_results_cluster_edge_betweenness)
+plot(cebd, giant_component, vertex.label=NA, vertex.size=4, 
+     vertex.frame.color=NA, edge.width= 1)
+```
+
+\newpage
+
+### 2 | Otimização de Modularidade (*Fast Greedy*)
+
+```{r}
+# Iterar 5 vezes o algoritmo para verificar os resultados
+results_list_cluster_fast_greedy <- list()
+for (i in 1:5) {
+  set.seed(i*123) # Para reprodutibilidade
+  cfgr <- cluster_fast_greedy(giant_component)
+  results_list_cluster_fast_greedy[[i]] <- data.frame(
+    Método = paste("Fast Greedy [", i, "]", sep=""),
+    Número_de_Comunidades = length(cfgr),
+    Dimensão_de_Cada_Comunidade = toString(table(membership(cfgr)), collapse = ','),
+    Modularidade = round(modularity(cfgr), 3)
+  )
+}
+
+# Combinar os resultados num único dataframe
+all_results_cluster_fast_greedy <- do.call(rbind,
+                                           results_list_cluster_fast_greedy)
+t(all_results_cluster_fast_greedy)
+plot(cfgr, giant_component, vertex.label=NA, vertex.size=4, 
+     vertex.frame.color=NA, edge.width= 1)
+```
+
+\newpage
+
+### 3 | Algoritmo de Louvain
+
+```{r}
+# Iterar 5 vezes o algoritmo para verificar os resultados
+results_list_cluster_louvain <- list()
+for (i in 1:5) {
+  set.seed(i*123) # Para reprodutibilidade
+  clor <- cluster_louvain(giant_component)
+  results_list_cluster_louvain[[i]] <- data.frame(
+    Método = paste("Algoritmo de Louvain [", i, "]", sep=""),
+    Número_de_Comunidades = length(clor),
+    Dimensão_de_Cada_Comunidade = toString(table(membership(clor)), collapse = ','),
+    Modularidade = round(modularity(clor), 3)
+  )
+}
+
+# Combinar os resultados num único dataframe
+all_results_cluster_louvain <- do.call(rbind,
+                                       results_list_cluster_louvain)
+t(all_results_cluster_louvain)
+plot(clor, giant_component, vertex.label=NA, vertex.size=4, 
+     vertex.frame.color=NA, edge.width= 1)
+```
+
+\newpage
+
+### 4 | Propagação de Etiquetas
+
+```{r}
+# Iterar 5 vezes o algoritmo para verificar os resultados
+results_list_cluster_label_prop <- list()
+for (i in 1:5) {
+  set.seed(i*123)
+  clpr <- cluster_label_prop(giant_component)
+  results_list_cluster_label_prop[[i]] <- data.frame(
+    Método = paste("Propagação de Etiquetas [", i, "]", sep=""),
+    Número_de_Comunidades = length(clpr),
+    Dimensão_de_Cada_Comunidade = toString(table(membership(clpr)), collapse = ','),
+    Modularidade = round(modularity(clpr), 3)
+  )
+}
+all_results_cluster_label_prop <- do.call(rbind, results_list_cluster_label_prop)
+
+t(all_results_cluster_label_prop)
+plot(clpr, giant_component, vertex.label=NA, vertex.size=4, 
+     vertex.frame.color=NA, edge.width= 1)
+```
+
+\newpage
+
+```{r}
+# Combinar todos os resultados num único dataframe
+resultados_completos <- bind_rows(all_results_cluster_edge_betweenness,
+                                  all_results_cluster_fast_greedy,
+                                  all_results_cluster_louvain,
+                                  all_results_cluster_label_prop)
+ftable <- flextable(resultados_completos)
+ftable <- border_remove(x = ftable) %>%
+  hline(i= 1, part = "header", border = fp_border(color = "navy", width = 2)) %>%
+  hline_bottom(part = "body", border = fp_border(color = "navy", width = 1)) %>%
+  vline(j=1:3, border = fp_border(color = "white", width = 5)) %>%
+  align(j= 1:4, align = "center", part = "all") %>%
+  bg(i=1, j = 2:4, bg = "navy", part = "header") %>%
+  color(i=1, j = 2:4, color = "white", part = "header") %>%
+  set_header_labels(Número_de_Comunidades = "Número de Comunidades",
+                    Dimensão_de_Cada_Comunidade = "Dimensão das Comunidade",
+                    Modularidade = 'Modularidade') %>%
+  bold(bold = TRUE, part = "header") %>%  bold(j = 1, bold = TRUE, part = "body") %>%
+  color(i=1, j = 1, color = "navy", part = "header") %>%
+  autofit() %>% hrule(rule = "exact", part = "all")
+ftable
+```
+
+
+
+
+
+
+

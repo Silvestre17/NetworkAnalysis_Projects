@@ -1,0 +1,430 @@
+---
+title: "Trabalho 1 | AR"
+subtitle: "Rede de Contactos Sociais"
+author: 
+- André Silvestre Nº104532
+- Eliane Gabriel Nº103303
+- Maria João Lourenço Nº104716
+- Margarida Pereira Nº105877
+- Umeima Mahomed Nº 99239
+date: 15 de dezembro de 2023
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+# Bibliotecas Necessárias
+library(igraph)       # Redes
+library(flextable)    # Tabela
+library(officer)      # Personalizar flextable
+library(ftExtra)
+```
+
+# Questão 1
+
+```{r}
+# Importar a rede de um ficheiro .txt
+rede <- read_graph("trab_links.txt", format = "edgelist", directed=F)
+
+# Representar graficamente a rede
+plot(rede, vertex.color= "orange", vertex.label=NA, vertex.size=2,
+     vertex.frame.color=NA, edge.width= 2)
+```
+
+### Nº de Nodos e de Ligações
+
+```{r}
+cat("A rede tem", vcount(rede) ,'nodos e', ecount(rede), 'ligações.')
+```
+
+### Densidade
+
+```{r}
+edge_density(rede)
+```
+
+
+### Graus dos Nodos
+
+```{r}
+# Grau de cada nó
+grau <- data.frame("Grau (k_i)"=degree(rede,mode='all'))
+grau_transposto <- as.data.frame(t(grau))
+colnames(grau_transposto) <- 1:vcount(rede) # Cada coluna é um nodo
+grau_transposto
+```
+
+
+### Grau Médio
+
+```{r}
+# Grau médio
+cat("<k> =",mean(degree(rede,mode='all')))
+```
+
+### Distribuição dos Graus
+
+```{r}
+# Distribuição de frequências do grau
+knitr::kable(t(table(factor(degree(rede,mode='all'), levels = 1:max(degree(rede,mode='all'))))))
+```
+
+### Extra - Representação dos nodos proporcional ao grau
+
+```{r}
+# Representação dos nodos proporcional ao grau
+plot(rede, vertex.size=degree(rede,mode="all")*2, vertex.color= "orange", 
+     vertex.label=NA, vertex.frame.color=NA, edge.width= 2)
+```
+
+### Rede Conexa ou Não Conexa?
+
+```{r}
+# Verificar se a rede é conexa
+is_connected <- is.connected(rede)
+cat("A rede é conexa?", is_connected, "\n")
+
+if (!is_connected) {
+  # Se a rede não for conexa, calcular o nº de componentes conexas e as dim. máx e mín dessas componentes
+  components <- clusters(rede)
+  num_components <- components$no
+  min_size <- min(components$csize)
+  max_size <- max(components$csize)
+  cat("Número de componentes conexas:", num_components, "\n")
+  cat("Dimensão mínima das componentes conexas:", min_size, "\n")
+  cat("Dimensão máxima das componentes conexas:", max_size, "\n")
+}
+```
+
+### Associação de Grau
+
+```{r}
+# Coeficiente de Assortatividade - Coeficiente de correlação de Pearson para os graus dos nodos adjacentes.
+assortativity_degree(rede) 
+
+# Determina os valores da função knn - Média do grau dos vizinhos
+knn(rede)$knnk
+```
+### Média dos Comprimentos dos Caminhos + Curtos
+
+```{r}
+# Calcular a média dos caminhos mais curtos pela fórmula
+caminhos_mais_curto <- distances(rede, algorithm = 'dijkstra')
+soma_inversos <- sum(1 / caminhos_mais_curto[caminhos_mais_curto > 0])
+((2 * soma_inversos) / (vcount(rede) * (vcount(rede) - 1)))^(-1)
+
+# Média da Distância - Ignora as distâncias de caminhos inexistentes.
+mean_distance(rede)
+```
+
+### Diâmetro da Rede
+
+```{r}
+diameter(rede)
+```
+
+### Estudo dos Triângulos da Rede
+
+```{r}
+# Determinar o nº de triângulos da rede 
+sum(count_triangles(rede))
+
+# Determinar a média do coeficiente de clustering para nodos com grau > 1
+mean(transitivity(rede, type = "local")[(degree(rede) > 1)], na.rm = TRUE)
+
+# Determinar o coeficiente de clustering da rede 
+transitivity(rede,type="global")
+```
+
+### Parâmetro de Heterogenidade
+
+```{r}
+deg <- degree(rede,mode="total") 
+hist(deg, col = 'orange',
+     main = 'Histograma com a Distribuição de Grau da Rede',
+     xlab = 'Graus',
+     ylab = 'Nº de Nodos', 
+     ylim = c(0,500),
+     xlim= c(0,20))
+
+ht <- mean(deg*deg)/(mean(deg)^2) 
+ht
+```
+### Estudo dos *Hubs* da Rede
+
+```{r}
+# closeness(rede)        # Centralidade de proximidade
+
+# centr_clo(rede)        # Normalização
+
+# betweenness(rede)      # Centralidade 
+
+# edge.betweenness(rede) # Intermediação de Ligações
+```
+
+
+### Decomposição da Rede (Core Decomposition)
+
+```{r}
+# Decomposição de core da rede
+coreness <- coreness(rede, mode="all")                  # Escreve num vector o valor do k-core de cada nodo.
+cat("Conchas (shells) na rede:")
+knitr::kable(t(table(factor(coreness, levels = 1:8))))
+
+# Representação gráfica do vector kc
+barplot(table(factor(coreness, levels = 1:8)), 
+        col = 'orange',
+        main = "Decomposição de k-core na Rede",
+        xlab = "Valor do k-core",
+        ylab = "Número de Nodos",
+        ylim = c(0,400))
+
+# Representa os nodos com indicação do core e em tamanho proporcional ao valor de kc.
+plot(rede,
+     vertex.size=coreness*10/4, 
+     vertex.label=coreness, 
+     vertex.label.color=c("black"),
+     vertex.label.cex = 0.5,
+     vertex.color= "orange", 
+     vertex.frame.color=NA, 
+     edge.width= 2)
+```
+
+
+---
+
+\newpage
+
+# Questão 2
+
+### Componente Gigante
+
+```{r}
+# components(rede) # A componente gigante é a 1ª do csize
+
+# Encontrar a componente gigante da rede
+giant_component <- induced.subgraph(rede, which(components$membership == which.max(components$csize)))
+
+# Representar graficamente a componente gigante da rede
+plot(giant_component, 
+     vertex.color= "red",
+     vertex.label=NA, 
+     vertex.size=2,
+     vertex.frame.color=NA, 
+     edge.width= 2)
+```
+
+### Nº de Nodos e de Ligações da Subrede Componente Gigante da Rede
+
+```{r}
+cat("Número de nós na componente gigante:", vcount(giant_component), "\n")
+cat("Número de ligações na componente gigante:", ecount(giant_component), "\n")
+```
+
+### Densidade da Componente Gigante
+
+```{r}
+edge_density(giant_component)
+```
+
+
+### Graus dos Nodos da Componente Gigante
+
+```{r}
+# Grau de cada nó
+grau_cg <- data.frame("Grau (k_i)"=degree(giant_component,mode='all'))
+grau_transposto_cg <- as.data.frame(t(grau_cg))
+colnames(grau_transposto_cg) <- 1:vcount(giant_component) # Cada coluna é um nodo
+grau_transposto_cg
+```
+
+
+### Grau Médio da Componente Gigante
+
+```{r}
+# Grau médio
+cat("<k> =",mean(degree(giant_component,mode='all')))
+```
+
+### Distribuição dos Graus da Componente Gigante
+
+```{r}
+# Distribuição de frequências do grau.
+knitr::kable(t(table(factor(degree(giant_component,mode='all'), 
+                            levels = 1:max(degree(giant_component,mode='all'))))))
+```
+
+### Extra - Representação dos nodos proporcional ao grau da Componente Gigante
+
+```{r warning=FALSE}
+# Representação dos nodos proporcional ao grau
+plot(rede, 
+     vertex.size=degree(giant_component,mode="all")*1, 
+     vertex.color= "red", 
+     vertex.label=NA,
+     vertex.frame.color=NA, 
+     edge.width= 2)
+```
+
+### Associação de Grau da Componente Gigante
+
+```{r}
+# Coeficiente de Assortatividade - Coeficiente de correlação de Pearson para os graus dos nodos adjacentes.
+assortativity_degree(giant_component) 
+
+#  Determina os valores da função knn - Média do grau dos vizinhos
+knn(giant_component)$knnk
+```
+
+### Média dos Comprimentos dos Caminhos + Curtos da Componente Gigante
+
+```{r}
+# Média da Distância - Ignora as distâncias de caminhos inexistentes.
+mean_distance(giant_component)
+```
+### Diâmetro da rede da Componente Gigante
+
+```{r}
+diameter(giant_component)
+```
+
+### Estudo dos Triângulos da rede
+
+```{r}
+# Determinar o nº de triângulos da componente gigante 
+sum(count_triangles(giant_component))
+
+# Determinar a média do coeficiente de clustering para nodos com grau > 1 da componente gigante
+mean(transitivity(giant_component, type = "local")[(degree(giant_component) > 1)], na.rm = TRUE)
+
+# Determinar o coeficiente de clustering da componente gigante 
+transitivity(giant_component,type="global")
+```
+
+### Parâmetro de Heterogenidade da Componente Gigante
+
+```{r}
+deg_giant <- degree(giant_component, mode="total") 
+hist(deg_giant, 
+     col = 'darkred',
+     main = 'Histograma com a Distribuição de Grau da Componente Gigante',
+     xlab = 'Graus',
+     ylab = 'Nº de Nodos',
+     xlim = c(0,20))
+ht_giant <- mean(deg_giant*deg_giant)/(mean(deg_giant)^2) 
+ht_giant
+```
+
+### Estudo dos *Hubs* da Componente Gigante
+
+```{r}
+# closeness(giant_component)        # Centralidade de proximidade
+
+# centr_clo(giant_component)        # Normalização
+
+# betweenness(giant_component)      # Centralidade 
+
+# edge.betweenness(giant_component) # Intermediação de Ligações
+```
+
+
+### Decomposição (*Core Decomposition*) da Componente Gigante
+
+```{r}
+# Decomposição de core da componente gigante
+coreness_giant <- coreness(giant_component, mode="all")   # Escreve num vector o valor do k-core de cada nodo.
+cat("Conchas (shells) na componente gigante:")
+knitr::kable(t(table(factor(coreness_giant, levels = 1:max(coreness_giant)))))
+
+# Representação gráfica do vector kc da Componente Gigante
+barplot(table(factor(coreness_giant, levels = 1:max(coreness_giant))), 
+        col = 'darkred',
+        main = "Decomposição de k-core na Componente Gigante",
+        xlab = "Valor do k-core",
+        ylab = "Número de Nodos", 
+        ylim=c(0,160))
+
+
+# Representa os nodos com indicação do core e em tamanho proporcional ao valor de kc.
+plot(giant_component,
+     vertex.size=coreness_giant*10/3, 
+     vertex.label=coreness_giant, 
+     vertex.label.color=c("white"),
+     vertex.label.cex = 0.5,
+     vertex.color= "red", 
+     vertex.frame.color=NA, edge.width= 2)
+```
+
+
+
+---
+
+\newpage
+
+# Questão 3
+
+```{r}
+# Q3: Comparação entre a rede completa e a componente gigante
+
+# Criar um dataframe comparativo dos resultados
+df <- data.frame(
+  Nodos = c('**Nº de Nodos *(***$N$ ***)***', vcount(rede), vcount(giant_component)),
+  Ligacoes = c('**Nº de Ligações *(***$L$***)***', ecount(rede), ecount(giant_component)),
+  Densidade = c('**Densidade *(***$d$ ***)***', round(edge_density(rede), 4),
+                round(edge_density(giant_component), 4)),
+  Grau_Medio = c('**Grau Médio *(***$<k>$***)***', 
+                 round(mean(degree(rede, mode = "all")), 4),
+                 round(mean(degree(giant_component, mode = "all")), 4)),
+  Coeficiente_de_Pearson = c('**Coeficiente de Pearson *(***$p$***)***',
+                             round(assortativity_degree(rede), 4),
+                             round(assortativity_degree(giant_component), 4)),
+  Media_Distancia = c('**Distância Média C+c*(***$<l>$***)***', 
+                      round(mean_distance(rede), 3),
+                      round(mean_distance(giant_component), 3)),
+  Diametro = c('**Diâmetro *(***$l_{max}$***)***', 
+               diameter(rede), diameter(giant_component)),
+  Triangulos = c('**Nº de Triângulos**', sum(count_triangles(rede)),
+                 sum(count_triangles(giant_component))),
+  
+  # Coeficiente de Cluster médio dos nodos (<C>)
+  Coef_custering_medio = c('**Coeficiente de Cluster médio dos nodos *(***$<C>$***)***', 
+                           round(mean(
+                             transitivity(rede, 
+                                          type = "local")[(degree(rede) > 1)], 
+                             na.rm = TRUE), 4),
+                           round(mean(
+                             transitivity(giant_component, 
+                                          type = "local")[(degree(giant_component) > 1)], 
+                             na.rm = TRUE), 4)),
+
+  # Coeficiente de Cluster da rede (C)
+  Coef_custering_rede = c('**Coeficiente de Cluster da (sub)rede *(***$C$***)***', 
+                            round(transitivity(rede, type="global"), 4),
+                            round(transitivity(giant_component, type="global"), 4)),
+  Heterogeneidade = c('**Heterogeneidade *(***$K$***)***', round(ht, 2), round(ht_giant, 2)),
+  N_Conchas = c('**Nº de Conchas**', max(coreness(rede, mode="all")), 
+                max(coreness(giant_component, mode="all")))
+  
+)
+
+# Criar a tabela flextable
+ftable <- flextable(as.data.frame(t(df))) %>% colformat_md()
+
+# Personalizar a tabela
+set_flextable_defaults(fonts_ignore=TRUE)
+ftable <- border_remove(x = ftable) %>% 
+  hline(i= 1, part = "header", border = fp_border(color = "gray", width = 2)) %>%
+  hline_bottom(part = "body", border = fp_border(color = "grey", width = 1)) %>% 
+  vline(j=1:2, border = fp_border(color = "white", width = 5)) %>% 
+  align(j= 2:3, align = "center", part = "all") %>% 
+  bg(j = 2, bg = "#ED7D31", part = "header") %>% 
+  bg(j = 3, bg = "darkred", part = "header") %>% 
+  color(j = 2:3, color = "white", part = "header") %>%
+  set_header_labels(V1 = "", V2 = "Rede Completa", V3 = "Componente Gigante") %>%
+  bold(bold = TRUE, part = "header") %>%
+  autofit()
+ftable
+```
